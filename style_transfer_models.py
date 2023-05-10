@@ -9,6 +9,7 @@ from Models.ST_VAE.libs.Matrix import MulLayer
 import torch.nn as nn
 import Models.StyTR2.models.transformer as transformer
 import Models.StyTR2.models.StyTR as StyTR
+from thop import profile, clever_format
 
 class VAE():
     def __init__(self):
@@ -37,6 +38,8 @@ class VAE():
         self.vgg = vgg
         self.dec = dec
         self.matrix = matrix
+        self.flops = '139 Giga-FLOPs'
+        self.n_params = '12.8 Million Parameters'
 
     def transform_image(self, content, ref, *args):
 
@@ -61,6 +64,53 @@ class VAE():
 
         transformed_img = Image.fromarray(np.uint8(prediction))
         return transformed_img
+    
+    def get_flops(self, calculate = False):
+        if(self.flops is None):
+            calculate = True
+        
+        if(calculate):
+            input = torch.randn(1, 3, 512, 512).to(self.device)
+
+            flops1, params1 = profile(self.vgg, inputs=(input, ))
+            sF = self.vgg(input)
+
+
+            flops2, params2 = profile(self.matrix, inputs=(sF['r41'], sF['r41']))
+            feature, _, _ = self.matrix(sF['r41'], sF['r41'])
+
+            flops3, params3 = profile(self.dec, inputs=(feature, ))
+            flops = flops1+flops2+flops3
+            params = params1+params2+params3
+
+            flops, params = clever_format([flops, params], "%.3f")
+
+            self.flops = flops
+            self.n_params = params
+        return (self.flops, self.n_params)
+
+
+
+class VGG():
+    def __init__(self):
+        self.transform = transforms.Compose([
+            transforms.ToTensor(), # range [0, 255] -> [0.0,1.0]
+            transforms.Resize(512),
+            transforms.Lambda(lambda x: x[:3])
+        ])
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # print(self.device)
+
+
+        self.model = VAE()
+        self.flops = '86.9 Giga-FLOPs'
+
+    def transform_image(self, content, ref, *args):
+
+        transformed_img = self.model.transform_image(content, ref)
+        transformed_img = self.model.transform_image(transformed_img, content)
+        return transformed_img
+    
 
 class PicsartAPI():
     def __init__(self):
@@ -77,12 +127,13 @@ class PicsartAPI():
         }
 
         response = requests.request("POST", self.url, headers=self.headers, data=payload, files=self.files)
-        # print(response.json())
+        print(response.json())
 
         transformed_img = None
         if(response.status_code==200):
             transformed_img = Image.open(requests.get(response.json()['data']['url'], stream=True).raw)
         return transformed_img
+
 
 class Transformer():
     def __init__(self):
@@ -137,15 +188,19 @@ class Transformer():
 
         self.content_tf = self.test_transform(content_size, crop)
         self.style_tf = self.test_transform(style_size, crop)
+        self.flops = '896.8 Giga-FLOPs'
+        self.n_params = '35.7 Million Parameters'
 
     def test_transform(self, size, crop):
         transform_list = []
     
         if size != 0: 
             transform_list.append(transforms.Resize(size))
+
         if crop:
             transform_list.append(transforms.CenterCrop(size))
         transform_list.append(transforms.ToTensor())
+        transform_list.append(transforms.Lambda(lambda x: x[:3]))
         transform = transforms.Compose(transform_list)
         return transform
     def style_transform(self, h,w):
@@ -166,11 +221,11 @@ class Transformer():
         return transform
     
     def transform_image(self, content_img, style_img, *args):
-        content_tf1 = self.content_transform()       
+        # content_tf1 = self.content_transform()       
         content = self.content_tf(content_img)
 
         h,w,c=np.shape(content)    
-        style_tf1 = self.style_transform(h,w)
+        # style_tf1 = self.style_transform(h,w)
         style = self.style_tf(style_img)
 
 
@@ -183,3 +238,15 @@ class Transformer():
         transformed_img = transforms.ToPILImage()(output[0])
 
         return transformed_img
+
+    def get_flops(self, calculate=False):
+        if(self.flops is None):
+            calculate = True
+        
+        if(calculate):
+            input = torch.randn(1, 3, 512, 512).to(self.device)
+            flops, params = profile(self.network, inputs=(input, input))
+            flops, params = clever_format([flops, params], "%.3f")
+            self.flops = flops
+            self.n_params = params
+        return (self.flops, self.n_params)

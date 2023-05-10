@@ -1,5 +1,8 @@
 # Custom Files
 Pipfile
+Models/StyTR2/experiments/vgg_normalised.pth
+Models/StyTR2/experiments/transformer_iter_160000.pth
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

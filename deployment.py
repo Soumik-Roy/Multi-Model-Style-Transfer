@@ -25,6 +25,7 @@ st.markdown(
 )
 
 model_vae = style_transfer_models.VAE()
+model_vgg = style_transfer_models.VGG()
 model_picsart = style_transfer_models.PicsartAPI()
 # model_transformer = style_transfer_models.Transformer()
 
@@ -40,6 +41,7 @@ st.sidebar.header("Select Model Architecture")
 model_options = {
     'Variational AE': model_vae,
     'Pics-Art API' : model_picsart,
+    'VGG-19' : model_vgg,
     'Transformer' : None,
     'Compare All'.upper() : "all",
 }
@@ -99,7 +101,7 @@ if st.button("Transform", type='primary'):
                 imgs = []
                 times = []
 
-                model_names = ['Variational AE', 'Pics-Art API', 'Transformer']
+                model_names = ['Variational AE', 'Pics-Art API', 'VGG-19']
 
                 for i in range(len(model_names)):
                     # print(model_names[i])
@@ -169,4 +171,11 @@ if type(transformed_img)==list:
                     st.image(transformed_img[2]['img'],width=300, caption=f"generated in {transformation_time[2]:.1f} seconds")
 elif transformed_img is not None:
     st.subheader('Transformed Image')
-    st.image(transformed_img,width=300, caption=f"generated in {transformation_time:.1f} seconds")
+    flops = ""
+    if(selected_model in ['Variational AE', 'VGG-19'] and model_options[selected_model] is not None):
+        flops = f", {model_options[selected_model].flops} Performed"
+    st.image(transformed_img,width=300, caption=f"generated in {transformation_time:.1f} seconds {flops}")
+    # st.markdown(f'<p style="text-align: center; font-size: 3; colos: grey">{flops}</p>',unsafe_allow_html=True)
+
+    # with st.columns(3)[1]:
+    #     st.caption(flops)
