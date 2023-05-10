@@ -1,1 +1,0 @@
-stylization results are here!
